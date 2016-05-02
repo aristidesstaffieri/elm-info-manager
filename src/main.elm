@@ -1,43 +1,85 @@
-module Main where
-
-import StartApp
-import Task exposing (Task)
-import Signal exposing (Signal, Address)
-import Effects exposing (Effects, Never)
-import Html exposing (Html)
-
---
--- StartApp boilerplate
---
-app : StartApp.App Model
-app =
-  StartApp.start { init = init, view = view, update = update, inputs = [] }
+import Html exposing (..)
+import Html.Attributes exposing (..)
+import Html.Events exposing (on, targetValue)
+import Signal exposing (Address)
+import Regex exposing (regex, contains)
+import StartApp.Simple as StartApp
+import String exposing (..)
+import Styles exposing (..)
 
 main : Signal Html
 main =
-  app.html
+  StartApp.start { model = empty, view = view, update = update }
 
-port tasks : Signal (Task Never ())
-port tasks =
-  app.tasks
+-- MODEL
 
---
--- My type declarations
---
-type alias Model = String
+type alias Model =
+  {  searchList : List String
+  ,  search : String
+  }
 
-type Action = NoOp
+empty : Model
+empty =
+  {  searchList = ["First", "Second", "Third"]
+  ,  search = ""
+  }
 
---
--- My functions
---
-init : (Model, Effects Action)
-init = ("Hello World", Effects.none)
+-- UPDATE
 
-update : Action -> Model -> (Model, Effects Action)
+type Action = Search String
+
+update : Action
+  -> {a | searchList : List String}
+  -> {a | searchList : List String}
 update action model =
   case action of
-    NoOp -> (model, Effects.none)
+    Search search ->
+      { model | searchList = checkList model.searchList search  }
+
+checkList : List String -> String -> List String
+checkList itemList search =
+  if length search < 1 then
+    empty.searchList
+  else
+    List.filter (\n -> Regex.contains (regex search) n) itemList
+
+
+-- VIEW
+
+renderItem : String -> Html
+renderItem item =
+  li [listItemStyle] [text item]
+
+renderList : List String -> Html
+renderList itemList =
+  let
+    l = List.map renderItem itemList
+  in
+    ul [listStyle] l
+
+renderContainer : Address Action -> List String -> a -> Html
+renderContainer address itemList search =
+  div [mainContainerStyles]
+  [  div [searchContainerStyles]
+        [  input
+            [ style [  ("border", "1px solid #fff")
+                    ,  ("border-radius", "5px")
+                    ,  ("padding", "1%")
+                    ,  ("width", "120px")
+                    ]
+              , type' "text"
+            , placeholder ""
+            , on "input" targetValue (\string -> Signal.message address (Search string))
+            ]
+        []
+
+        ]
+  ,
+      div [containerStyles] [renderList itemList]
+  ]
+
 
 view : Address Action -> Model -> Html
-view address model = Html.text model
+view address model =
+  div [appStyles]
+  [ renderContainer address model.searchList model.search ]
